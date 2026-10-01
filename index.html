@@ -1,362 +1,402 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sparta TS Sales - Global Intelligence</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sparta Technology Solutions · Growth Dashboard</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body{font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  .tgl{position:relative;width:44px;height:24px;border-radius:9999px;background:#cbd5e1;transition:background .2s;flex:none}
+  .tgl::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:9999px;background:#fff;transition:transform .2s;box-shadow:0 1px 2px rgba(0,0,0,.3)}
+  .tgl[aria-checked="true"]{background:#2563eb}
+  .tgl[aria-checked="true"]::after{transform:translateX(20px)}
+  .tgl:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid #2563eb;outline-offset:2px}
+  .bar{transition:width .5s ease}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
 </head>
-<body class="bg-slate-50 text-slate-900 font-sans antialiased min-h-screen flex flex-col">
+<body class="bg-slate-100 text-slate-800 min-h-screen">
+
+<div class="flex min-h-screen">
+  <!-- Sidebar -->
+  <aside id="sidebar" class="fixed inset-y-0 left-0 z-30 w-64 -translate-x-full lg:translate-x-0 bg-slate-900 text-slate-300 flex flex-col transition-transform">
+    <div class="px-6 py-6 border-b border-slate-800">
+      <div class="text-white text-lg font-semibold tracking-tight">Sparta</div>
+      <div class="text-xs text-slate-400">Technology Solutions</div>
+    </div>
+    <nav class="flex-1 p-3 space-y-1" aria-label="Main">
+      <button data-nav="prospects" class="nav w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium transition">Prospects (US, CA, EU)</button>
+      <button data-nav="outreach" class="nav w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium transition">AI Email Outreach</button>
+      <button data-nav="quality" class="nav w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium transition">Quality &amp; Account Study</button>
+    </nav>
+    <div class="p-4 text-xs text-slate-500 border-t border-slate-800">BPO &amp; IT Managed Services</div>
+  </aside>
+  <div id="scrim" class="fixed inset-0 z-20 bg-slate-900/50 hidden lg:hidden"></div>
+
+  <div class="flex-1 lg:ml-64 min-w-0">
     <!-- Header -->
-    <header class="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center shadow-sm">
-        <div class="flex items-center space-x-3">
-            <!-- Logo Image pointing to logo.png in your repository -->
-            <img src="logo.png" alt="Sparta Technology Solutions" class="h-10 object-contain" onerror="this.style.display='none'; document.getElementById('fallbackTitle').style.display='block';">
-            <div id="fallbackTitle" style="display:none;">
-                <h1 class="font-bold text-lg leading-tight text-slate-900">SPARTA TECHNOLOGY SOLUTIONS</h1>
-                <p class="text-xs text-blue-600 font-medium">Global Sales & Managed Services Workspace</p>
-            </div>
+    <header class="sticky top-0 z-10 bg-white/90 backdrop-blur border-b border-slate-200">
+      <div class="flex flex-wrap items-center gap-3 px-4 sm:px-6 py-3">
+        <button id="menuBtn" class="lg:hidden p-2 rounded-lg border border-slate-200" aria-label="Open navigation">
+          <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 5h14M3 10h14M3 15h14"/></svg>
+        </button>
+        <h1 id="pageTitle" class="text-lg font-semibold text-slate-900 mr-auto"></h1>
+        <label class="sr-only" for="apiKey">Gemini API key</label>
+        <div class="flex items-center gap-2">
+          <input id="apiKey" type="password" autocomplete="off" placeholder="Gemini API key" class="w-44 sm:w-56 rounded-lg border border-slate-300 px-3 py-2 text-sm">
+          <button id="saveKey" class="rounded-lg bg-slate-900 text-white px-3 py-2 text-sm font-medium hover:bg-slate-700 transition">Save key</button>
+          <button id="clearKey" class="rounded-lg border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50 transition">Clear</button>
         </div>
-        <!-- Gemini API / Status -->
-        <div class="flex items-center space-x-2">
-            <input type="password" id="apiKey" placeholder="Gemini API Key (Optional)" class="bg-slate-100 border border-slate-300 px-3 py-1.5 rounded text-sm text-slate-800 focus:outline-none focus:border-blue-500 w-56 text-xs">
-            <button onclick="saveApiKey()" class="bg-slate-200 hover:bg-slate-300 text-xs px-3 py-2 rounded font-medium transition text-slate-700">Save Key</button>
-        </div>
+      </div>
+      <div id="keyNote" class="px-4 sm:px-6 pb-2 text-xs text-slate-500">Your key stays in this browser's local storage and is only sent to Google's Gemini API.</div>
     </header>
 
-    <div class="flex flex-1">
-        <!-- Sidebar Navigation Tabs -->
-        <aside class="w-64 bg-white border-r border-slate-200 p-4 space-y-6 shadow-sm">
-            <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider px-2">Global Command</div>
-            <nav class="space-y-1">
-                <button onclick="switchTab('prospects')" id="nav-prospects" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg bg-blue-600 text-white font-medium text-sm shadow-md transition">
-                    <span>🌍 Prospects (US, CA, EU)</span>
-                </button>
-                <button onclick="switchTab('outreach')" id="nav-outreach" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-slate-100 font-medium text-sm transition">
-                    <span>✉️ AI Email Outreach</span>
-                </button>
-                <button onclick="switchTab('analysis')" id="nav-analysis" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-slate-100 font-medium text-sm transition">
-                    <span>📊 Quality & Account Study</span>
-                </button>
-            </nav>
-        </aside>
+    <div id="toast" class="hidden mx-4 sm:mx-6 mt-4 rounded-lg px-4 py-3 text-sm" role="status"></div>
 
-        <!-- Main Content Area -->
-        <main class="flex-1 p-8 overflow-y-auto">
-            
-            <!-- TAB 1: PROSPECTS -->
-            <div id="tab-prospects" class="space-y-6">
-                <div class="flex justify-between items-end">
-                    <div>
-                        <h2 class="text-2xl font-bold tracking-tight text-slate-900">Target Accounts</h2>
-                        <p class="text-sm text-slate-500 mt-1">International companies across America, Canada, and Europe requiring either Customer Service or IT Managed Services.</p>
-                    </div>
-                    <button onclick="findGlobalProspects()" id="findBtn" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2.5 rounded-lg font-medium text-sm shadow-md transition flex items-center space-x-2">
-                        <span>✨ Discover Global Prospects</span>
-                    </button>
-                </div>
+    <main class="p-4 sm:p-6">
+      <!-- Prospects -->
+      <section id="view-prospects" class="view space-y-4">
+        <div class="flex flex-wrap items-center gap-3">
+          <select id="fService" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm" aria-label="Filter by service">
+            <option value="">All services</option>
+            <option>Customer Support Outsourcing</option>
+            <option>IT Managed Services &amp; Infrastructure</option>
+          </select>
+          <select id="fRegion" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm" aria-label="Filter by region">
+            <option value="">All regions</option><option>US</option><option>CA</option><option>EU</option>
+          </select>
+          <div class="ml-auto">
+            <button id="discover" class="inline-flex items-center gap-2 rounded-lg bg-blue-600 text-white px-4 py-2 text-sm font-medium hover:bg-blue-700 disabled:opacity-60 transition">
+              <svg id="spin" class="hidden animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M12 3a9 9 0 1 0 9 9"/></svg>
+              <span id="discoverLabel">Discover New AI Prospects</span>
+            </button>
+          </div>
+        </div>
+        <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm min-w-[860px]">
+              <thead class="bg-slate-50 text-left text-slate-500">
+                <tr><th class="px-4 py-3 font-medium">Account</th><th class="px-4 py-3 font-medium">Region</th><th class="px-4 py-3 font-medium">Service need</th><th class="px-4 py-3 font-medium w-44">Fit score</th><th class="px-4 py-3 font-medium">Status</th><th class="px-4 py-3 font-medium text-right">Action</th></tr>
+              </thead>
+              <tbody id="tbody" class="divide-y divide-slate-100"></tbody>
+            </table>
+          </div>
+          <p id="empty" class="hidden p-8 text-center text-slate-500">No prospects match these filters. Clear a filter or discover new prospects.</p>
+        </div>
+      </section>
 
-                <div id="statusMsg" class="hidden bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-lg text-sm">
-                    Scanning North American and European markets for specific IT or Customer Service needs...
-                </div>
-
-                <div class="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-                    <table class="w-full text-left border-collapse">
-                        <thead>
-                            <tr class="border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase bg-slate-50">
-                                <th class="p-4">Company & Location</th>
-                                <th class="p-4">Decision Maker</th>
-                                <th class="p-4">Service Opportunity</th>
-                                <th class="p-4">Fit Score</th>
-                                <th class="p-4">Contact Status</th>
-                                <th class="p-4">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody id="prospectTable" class="divide-y divide-slate-100 text-sm">
-                            <tr class="hover:bg-slate-50 transition">
-                                <td class="p-4">
-                                    <div class="font-semibold text-slate-900">ApexCloud Logistics</div>
-                                    <div class="text-xs text-slate-500">🇺🇸 Chicago, USA</div>
-                                </td>
-                                <td class="p-4 text-xs text-slate-700">Sarah Jenkins<br><span class="text-slate-400">VP of Operations</span></td>
-                                <td class="p-4"><span class="bg-purple-50 text-purple-700 text-xs px-2.5 py-1 rounded-full font-medium border border-purple-200">Customer Support Outsourcing</span></td>
-                                <td class="p-4 font-bold text-blue-600">95 / 100</td>
-                                <td class="p-4">
-                                    <label class="inline-flex items-center cursor-pointer">
-                                        <input type="checkbox" class="sr-only peer" onchange="toggleStatus(this)">
-                                        <div class="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600 relative"></div>
-                                        <span class="ml-2 text-xs text-slate-600 status-text">Not Contacted</span>
-                                    </label>
-                                </td>
-                                <td class="p-4">
-                                    <button onclick="prepareEmail('ApexCloud Logistics', 'Sarah Jenkins', 'Customer Support Outsourcing', 'sarah@apexcloud.com')" class="bg-blue-600 hover:bg-blue-500 text-white text-xs px-3 py-1.5 rounded font-medium transition">Draft Email</button>
-                                </td>
-                            </tr>
-                            <tr class="hover:bg-slate-50 transition">
-                                <td class="p-4">
-                                    <div class="font-semibold text-slate-900">Vanguard Financial Tech</div>
-                                    <div class="text-xs text-slate-500">🇨🇦 Toronto, Canada</div>
-                                </td>
-                                <td class="p-4 text-xs text-slate-700">David Miller<br><span class="text-slate-400">IT Director</span></td>
-                                <td class="p-4"><span class="bg-amber-50 text-amber-700 text-xs px-2.5 py-1 rounded-full font-medium border border-amber-200">IT Managed Services</span></td>
-                                <td class="p-4 font-bold text-blue-600">92 / 100</td>
-                                <td class="p-4">
-                                    <label class="inline-flex items-center cursor-pointer">
-                                        <input type="checkbox" checked class="sr-only peer" onchange="toggleStatus(this)">
-                                        <div class="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600 relative"></div>
-                                        <span class="ml-2 text-xs text-slate-600 status-text">Contacted</span>
-                                    </label>
-                                </td>
-                                <td class="p-4">
-                                    <button onclick="prepareEmail('Vanguard Financial Tech', 'David Miller', 'IT Managed Services', 'david@vanguardfin.ca')" class="bg-blue-600 hover:bg-blue-500 text-white text-xs px-3 py-1.5 rounded font-medium transition">Draft Email</button>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+      <!-- Outreach -->
+      <section id="view-outreach" class="view hidden">
+        <div class="grid xl:grid-cols-2 gap-6">
+          <form id="oForm" class="bg-white rounded-xl border border-slate-200 p-5 space-y-4" novalidate>
+            <div class="grid sm:grid-cols-2 gap-4">
+              <div><label class="block text-sm font-medium mb-1" for="oCompany">Company</label><input id="oCompany" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="Northwind Retail"></div>
+              <div><label class="block text-sm font-medium mb-1" for="oContact">Contact name</label><input id="oContact" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="Jordan Lee"></div>
+              <div><label class="block text-sm font-medium mb-1" for="oTitle">Contact title</label><input id="oTitle" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="VP, Customer Experience"></div>
+              <div><label class="block text-sm font-medium mb-1" for="oTo">Contact email</label><input id="oTo" type="email" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="jordan@northwind.com"></div>
             </div>
-
-            <!-- TAB 2: OUTREACH EMAIL GENERATOR -->
-            <div id="tab-outreach" class="hidden space-y-6">
-                <div>
-                    <h2 class="text-2xl font-bold tracking-tight text-slate-900">AI Outreach Generator</h2>
-                    <p class="text-sm text-slate-500 mt-1">Generate high-converting cold outreach tailored specifically to whether the prospect needs customer care or IT support.</p>
-                </div>
-
-                <div class="bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-4">
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Target Company</label>
-                            <input type="text" id="outreachCompany" value="ApexCloud Logistics" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-sm text-slate-800">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Contact Name & Email</label>
-                            <input type="text" id="outreachContact" value="Sarah Jenkins (sarah@apexcloud.com)" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-sm text-slate-800">
-                        </div>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Service Opportunity</label>
-                        <select id="outreachService" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-sm text-slate-800">
-                            <option>Customer Support Outsourcing</option>
-                            <option>IT Managed Services & Infrastructure</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Generated Professional Email Draft</label>
-                        <textarea id="emailBody" rows="7" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-3 text-sm text-slate-800 leading-relaxed">Hi Sarah,
-
-I noticed ApexCloud Logistics is scaling rapidly across US hubs. Many fast-growing firms hit a bottleneck with high customer support ticket volumes.
-
-Sparta Technology Solutions provides elite 24/7 Customer Support Outsourcing designed to cut response times by 50% while lowering operational overhead.
-
-Are you open to a brief 10-minute chat this Thursday to explore how we can support your operations?
-
-Best regards,
-Sparta Technology Solutions Team</textarea>
-                    </div>
-                    <div class="flex justify-end space-x-3">
-                        <button onclick="generateCustomEmail()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm font-medium px-4 py-2.5 rounded-lg transition">Regenerate AI Draft</button>
-                        <button onclick="sendToGmail()" class="bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-5 py-2.5 rounded-lg shadow-md transition flex items-center space-x-2">
-                            <span>🚀 Send to Gmail Drafts</span>
-                        </button>
-                    </div>
-                </div>
+            <div>
+              <label class="block text-sm font-medium mb-1" for="oService">Service line</label>
+              <select id="oService" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm">
+                <option>Customer Support Outsourcing</option>
+                <option>IT Managed Services &amp; Infrastructure</option>
+                <option>Both service lines</option>
+              </select>
             </div>
-
-            <!-- TAB 3: MARKET ANALYSIS & ACCOUNT QUALITY STUDY -->
-            <div id="tab-analysis" class="hidden space-y-6">
-                <div>
-                    <h2 class="text-2xl font-bold tracking-tight text-slate-900">Prospect Quality & Market Study</h2>
-                    <p class="text-sm text-slate-500 mt-1">Deep-dive analysis evaluating prospect readiness, market demand distribution across North America & Europe, and individual account alignment.</p>
-                </div>
-
-                <div class="grid grid-cols-3 gap-6">
-                    <div class="bg-white border border-slate-200 p-5 rounded-xl shadow-sm space-y-2">
-                        <div class="text-blue-600 font-bold text-lg">93.8%</div>
-                        <div class="font-semibold text-slate-900">Average Prospect Fit Index</div>
-                        <p class="text-xs text-slate-500 leading-relaxed">Evaluated against remote infrastructure size, regional ticket volume growth, and hiring constraints in US, Canada, and EU.</p>
-                    </div>
-                    <div class="bg-white border border-slate-200 p-5 rounded-xl shadow-sm space-y-2">
-                        <div class="text-blue-600 font-bold text-lg">Customer Support (62%)</div>
-                        <div class="font-semibold text-slate-900">Primary Standalone Need</div>
-                        <p class="text-xs text-slate-500 leading-relaxed">Firms requiring dedicated outsourced agents for ticket resolution without needing full IT management.</p>
-                    </div>
-                    <div class="bg-white border border-slate-200 p-5 rounded-xl shadow-sm space-y-2">
-                        <div class="text-blue-600 font-bold text-lg">IT Managed Services (38%)</div>
-                        <div class="font-semibold text-slate-900">Secondary Standalone Need</div>
-                        <p class="text-xs text-slate-500 leading-relaxed">Firms looking strictly for infrastructure monitoring, cloud support, and technical helpdesk coverage.</p>
-                    </div>
-                </div>
-
-                <div class="bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-4">
-                    <h3 class="font-bold text-slate-900 text-base">Individual Account Quality Breakdown</h3>
-                    <div class="space-y-3 text-sm text-slate-600">
-                        <div class="p-3 bg-slate-50 rounded-lg border border-slate-100 flex justify-between items-center">
-                            <div>
-                                <span class="font-semibold text-slate-900">ApexCloud Logistics (USA)</span> — <span class="text-xs text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">Customer Support</span>
-                            </div>
-                            <span class="text-xs font-bold text-blue-600">Fit: 95/100 · High urgency due to seasonal support backlogs</span>
-                        </div>
-                        <div class="p-3 bg-slate-50 rounded-lg border border-slate-100 flex justify-between items-center">
-                            <div>
-                                <span class="font-semibold text-slate-900">Vanguard Financial Tech (Canada)</span> — <span class="text-xs text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">IT Managed Services</span>
-                            </div>
-                            <span class="text-xs font-bold text-blue-600">Fit: 92/100 · Strong need for secure cloud infrastructure monitoring</span>
-                        </div>
-                        <div class="p-3 bg-slate-50 rounded-lg border border-slate-100 flex justify-between items-center">
-                            <div>
-                                <span class="font-semibold text-slate-900">Nordic Cloud Systems (Sweden)</span> — <span class="text-xs text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">IT Managed Services</span>
-                            </div>
-                            <span class="text-xs font-bold text-blue-600">Fit: 97/100 · Expanding European server nodes requiring 24/7 oversight</span>
-                        </div>
-                    </div>
-                </div>
+            <div><label class="block text-sm font-medium mb-1" for="oPain">Known pain point or context <span class="text-slate-400 font-normal">(optional)</span></label><textarea id="oPain" rows="2" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="Scaling support during seasonal peaks"></textarea></div>
+            <div>
+              <label class="block text-sm font-medium mb-1" for="authuser">Work email for Gmail (authuser)</label>
+              <input id="authuser" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="you@yourcompany.com or account index, e.g. 1">
+              <p class="mt-1 text-xs text-slate-500">Drafts open in this signed-in Google account instead of your personal one. Saved in this browser.</p>
             </div>
+            <div class="flex flex-wrap gap-3">
+              <button type="button" id="oGen" class="rounded-lg bg-blue-600 text-white px-4 py-2 text-sm font-medium hover:bg-blue-700 transition">Generate template</button>
+              <button type="button" id="oAI" class="rounded-lg border border-blue-600 text-blue-700 px-4 py-2 text-sm font-medium hover:bg-blue-50 transition">Improve with Gemini</button>
+            </div>
+          </form>
+          <div class="bg-white rounded-xl border border-slate-200 p-5 space-y-4">
+            <div><label class="block text-sm font-medium mb-1" for="oSubject">Subject</label><input id="oSubject" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"></div>
+            <div><label class="block text-sm font-medium mb-1" for="oBody">Message</label><textarea id="oBody" rows="14" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm leading-relaxed"></textarea></div>
+            <div class="flex flex-wrap gap-3">
+              <button id="oSend" class="rounded-lg bg-slate-900 text-white px-4 py-2 text-sm font-medium hover:bg-slate-700 transition">Send to Gmail Drafts</button>
+              <button id="oCopy" class="rounded-lg border border-slate-300 px-4 py-2 text-sm hover:bg-slate-50 transition">Copy message</button>
+            </div>
+          </div>
+        </div>
+      </section>
 
-        </main>
-    </div>
+      <!-- Quality -->
+      <section id="view-quality" class="view hidden space-y-6">
+        <div id="kpis" class="grid grid-cols-2 lg:grid-cols-4 gap-4"></div>
+        <div class="grid lg:grid-cols-2 gap-6">
+          <div class="bg-white rounded-xl border border-slate-200 p-5"><h2 class="font-semibold mb-4">Service demand by region</h2><div id="chartRegion" class="space-y-4"></div></div>
+          <div class="bg-white rounded-xl border border-slate-200 p-5"><h2 class="font-semibold mb-4">Average fit by service line</h2><div id="chartService" class="space-y-4"></div></div>
+        </div>
+        <div class="bg-white rounded-xl border border-slate-200 p-5"><h2 class="font-semibold mb-4">Top accounts to contact next</h2><ol id="topList" class="divide-y divide-slate-100 text-sm"></ol></div>
+      </section>
+    </main>
+  </div>
+</div>
 
-    <script>
-        document.getElementById('apiKey').value = localStorage.getItem('gemini_key') || '';
+<script>
+"use strict";
+/* ---------- Constants ---------- */
+const SERVICES = ["Customer Support Outsourcing", "IT Managed Services & Infrastructure"];
+const REGIONS = ["US", "CA", "EU"];
+const MODEL = "gemini-2.5-flash";
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
-        function saveApiKey() {
-            const key = document.getElementById('apiKey').value.trim();
-            localStorage.setItem('gemini_key', key);
-            alert('API Key saved successfully!');
-        }
+/* ---------- Store (state + localStorage) ---------- */
+const Store = {
+  prospects: [
+    { id: 1, company: "Northwind Retail Group", industry: "E-commerce", region: "US", service: SERVICES[0], fit: 92, contacted: false, contact: "Dana Whitfield", title: "VP, Customer Experience", reason: "Rapid order growth and seasonal support peaks." },
+    { id: 2, company: "Maple Health Network", industry: "Healthcare", region: "CA", service: SERVICES[1], fit: 86, contacted: true, contact: "Priya Raman", title: "Director of IT", reason: "Multi-site clinics with aging infrastructure." },
+    { id: 3, company: "Rhein Logistik AG", industry: "Logistics", region: "EU", service: SERVICES[1], fit: 81, contacted: false, contact: "Lukas Brandt", title: "CIO", reason: "Consolidating data centers across Germany and Poland." },
+    { id: 4, company: "Brightpath Telecom", industry: "Telecom", region: "US", service: SERVICES[0], fit: 74, contacted: false, contact: "Marcus Boyd", title: "Head of Support Operations", reason: "High ticket volume and 24/7 coverage gaps." },
+    { id: 5, company: "Lumière Assurances", industry: "Insurance", region: "EU", service: SERVICES[0], fit: 68, contacted: false, contact: "Camille Laurent", title: "Customer Service Director", reason: "Claims inquiries need multilingual support." },
+    { id: 6, company: "Cascadia SaaS Inc.", industry: "Software", region: "CA", service: SERVICES[0], fit: 79, contacted: true, contact: "Ethan Cho", title: "COO", reason: "Self-serve growth outpacing the support team." }
+  ],
+  nextId: 100,
+  get(k, d = "") { try { return localStorage.getItem(k) ?? d; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, v); return true; } catch { return false; } },
+  del(k) { try { localStorage.removeItem(k); } catch {} },
+  load() {
+    try {
+      const saved = JSON.parse(this.get("sparta.prospects", "null"));
+      if (Array.isArray(saved) && saved.length) { this.prospects = saved; this.nextId = Math.max(100, ...saved.map(p => p.id + 1)); }
+    } catch {}
+  },
+  save() { this.set("sparta.prospects", JSON.stringify(this.prospects)); },
+  hasCompany(name) { const n = name.trim().toLowerCase(); return this.prospects.some(p => p.company.trim().toLowerCase() === n); },
+  add(p) { p.id = this.nextId++; this.prospects.unshift(p); this.save(); }
+};
 
-        function switchTab(tabId) {
-            ['prospects', 'outreach', 'analysis'].forEach(id => {
-                document.getElementById('tab-' + id).classList.add('hidden');
-                document.getElementById('nav-' + id).classList.remove('bg-blue-600', 'text-white', 'shadow-md');
-                document.getElementById('nav-' + id).classList.add('text-slate-600', 'hover:bg-slate-100');
-            });
-            document.getElementById('tab-' + tabId).classList.remove('hidden');
-            document.getElementById('nav-' + tabId).classList.remove('text-slate-600', 'hover:bg-slate-100');
-            document.getElementById('nav-' + tabId).classList.add('bg-blue-600', 'text-white', 'shadow-md');
-        }
+/* ---------- UI helpers ---------- */
+const UI = {
+  titles: { prospects: "Prospects (US, CA, EU)", outreach: "AI Email Outreach", quality: "Quality & Account Study" },
+  timer: null,
+  show(name) {
+    $$(".view").forEach(v => v.classList.toggle("hidden", v.id !== "view-" + name));
+    $$(".nav").forEach(b => {
+      const on = b.dataset.nav === name;
+      b.className = "nav w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium transition " + (on ? "bg-blue-600 text-white" : "hover:bg-slate-800 hover:text-white");
+      if (on) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
+    });
+    $("#pageTitle").textContent = this.titles[name];
+    this.closeMenu();
+    if (name === "quality") Analytics.render();
+    if (name === "prospects") Prospects.render();
+  },
+  toast(msg, type = "info") {
+    const t = $("#toast");
+    const cls = { info: "bg-blue-50 text-blue-800 border border-blue-200", ok: "bg-emerald-50 text-emerald-800 border border-emerald-200", err: "bg-red-50 text-red-800 border border-red-200" };
+    t.className = "mx-4 sm:mx-6 mt-4 rounded-lg px-4 py-3 text-sm " + cls[type];
+    t.textContent = msg;
+    clearTimeout(this.timer);
+    this.timer = setTimeout(() => t.classList.add("hidden"), 7000);
+  },
+  openMenu() { $("#sidebar").classList.remove("-translate-x-full"); $("#scrim").classList.remove("hidden"); },
+  closeMenu() { $("#sidebar").classList.add("-translate-x-full"); $("#scrim").classList.add("hidden"); },
+  fitColor: s => s >= 85 ? "bg-emerald-500" : s >= 70 ? "bg-blue-500" : "bg-amber-500"
+};
 
-        function toggleStatus(checkbox) {
-            const statusText = checkbox.parentElement.querySelector('.status-text');
-            if (checkbox.checked) {
-                statusText.textContent = "Contacted";
-            } else {
-                statusText.textContent = "Not Contacted";
-            }
-        }
+/* ---------- Gemini client ---------- */
+const Gemini = {
+  async call(prompt, { json = false } = {}) {
+    const key = Store.get("sparta.geminiKey");
+    if (!key) throw new Error("Add your Gemini API key in the header and select Save key.");
+    const body = { contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: json ? 1 : 0.7, ...(json ? { responseMimeType: "application/json" } : {}) } };
+    let res;
+    try {
+      res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
+        method: "POST", headers: { "Content-Type": "application/json", "x-goog-api-key": key }, body: JSON.stringify(body)
+      });
+    } catch { throw new Error("Could not reach the Gemini API. Check your connection and try again."); }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const m = data?.error?.message || res.statusText;
+      if (res.status === 400 || res.status === 403) throw new Error("Gemini rejected the API key. Check it and save it again. (" + m + ")");
+      if (res.status === 429) throw new Error("Gemini rate limit reached. Wait a minute and try again.");
+      throw new Error("Gemini error " + res.status + ": " + m);
+    }
+    const text = data?.candidates?.[0]?.content?.parts?.map(p => p.text || "").join("") || "";
+    if (!text) throw new Error("Gemini returned an empty response. Try again.");
+    return text;
+  },
+  parseJSON(text) {
+    const clean = text.replace(/```json|```/gi, "").trim();
+    try { return JSON.parse(clean); } catch {}
+    const m = clean.match(/\[[\s\S]*\]/);
+    if (m) { try { return JSON.parse(m[0]); } catch {} }
+    throw new Error("Gemini returned data that could not be read as JSON. Try again.");
+  }
+};
 
-        function prepareEmail(company, contactName, service, email) {
-            document.getElementById('outreachCompany').value = company;
-            document.getElementById('outreachContact').value = contactName + ' (' + email + ')';
-            
-            const serviceSelect = document.getElementById('outreachService');
-            if (service.includes('IT')) {
-                serviceSelect.value = 'IT Managed Services & Infrastructure';
-            } else {
-                serviceSelect.value = 'Customer Support Outsourcing';
-            }
-            
-            generateCustomEmail();
-            switchTab('outreach');
-        }
+/* ---------- Prospects ---------- */
+const Prospects = {
+  normalize(raw) {
+    if (!raw || typeof raw.company !== "string" || !raw.company.trim()) return null;
+    const region = String(raw.region || "").toUpperCase().trim();
+    const service = SERVICES.find(s => s.toLowerCase().startsWith(String(raw.service || "").toLowerCase().slice(0, 8))) || (/it|infra/i.test(raw.service || "") ? SERVICES[1] : SERVICES[0]);
+    const fit = Math.max(0, Math.min(100, Math.round(Number(raw.fit_score ?? raw.fit) || 60)));
+    return {
+      company: raw.company.trim(), industry: String(raw.industry || "General"), region: REGIONS.includes(region) ? region : "EU",
+      service, fit, contacted: false, contact: String(raw.contact_name || raw.contact || ""), title: String(raw.contact_title || raw.title || ""), reason: String(raw.reason || "")
+    };
+  },
+  async discover() {
+    const btn = $("#discover");
+    btn.disabled = true; $("#spin").classList.remove("hidden"); $("#discoverLabel").textContent = "Finding prospects…";
+    try {
+      const seed = Math.random().toString(36).slice(2, 8);
+      const focus = REGIONS[Math.floor(Math.random() * 3)];
+      const industries = ["fintech", "healthcare", "retail", "travel", "SaaS", "utilities", "education", "manufacturing", "media", "logistics", "insurance", "energy"].sort(() => Math.random() - 0.5).slice(0, 4).join(", ");
+      const known = Store.prospects.map(p => p.company).join("; ");
+      const prompt = `You are a B2B sales researcher for Sparta Technology Solutions, a global BPO and IT managed services provider. Suggest 5 realistic mid-size to enterprise target companies in the United States, Canada or the European Union that likely need either "${SERVICES[0]}" or "${SERVICES[1]}". Lean toward ${focus} and these industries: ${industries}. Variation seed: ${seed}. Do NOT include any of these existing companies: ${known}. Return ONLY a JSON array. Each item must have: company (string), industry (string), region (one of "US","CA","EU"), service (exactly "${SERVICES[0]}" or "${SERVICES[1]}"), fit_score (integer 40-98), contact_title (string, the likely decision maker role), reason (one sentence on why they need this service).`;
+      const list = Gemini.parseJSON(await Gemini.call(prompt, { json: true }));
+      const items = (Array.isArray(list) ? list : list?.prospects || []).map(r => this.normalize(r)).filter(Boolean);
+      let added = 0;
+      items.forEach(p => { if (!Store.hasCompany(p.company)) { Store.add(p); added++; } });
+      this.render();
+      UI.toast(added ? `Added ${added} new prospect${added > 1 ? "s" : ""}.` : "Gemini returned only companies you already have. Try again for fresh results.", added ? "ok" : "info");
+    } catch (e) { UI.toast(e.message, "err"); }
+    finally { btn.disabled = false; $("#spin").classList.add("hidden"); $("#discoverLabel").textContent = "Discover New AI Prospects"; }
+  },
+  filtered() {
+    const s = $("#fService").value, r = $("#fRegion").value;
+    return Store.prospects.filter(p => (!s || p.service === s) && (!r || p.region === r));
+  },
+  render() {
+    const rows = this.filtered();
+    $("#empty").classList.toggle("hidden", rows.length > 0);
+    $("#tbody").innerHTML = rows.map(p => `
+      <tr class="hover:bg-slate-50 transition">
+        <td class="px-4 py-3"><div class="font-medium text-slate-900">${esc(p.company)}</div><div class="text-xs text-slate-500">${esc(p.industry)}${p.title ? " · " + esc(p.title) : ""}</div></td>
+        <td class="px-4 py-3"><span class="rounded-md bg-slate-100 px-2 py-1 text-xs font-medium">${esc(p.region)}</span></td>
+        <td class="px-4 py-3 text-slate-600">${esc(p.service)}</td>
+        <td class="px-4 py-3"><div class="flex items-center gap-2"><div class="h-2 flex-1 rounded-full bg-slate-100"><div class="h-2 rounded-full ${UI.fitColor(p.fit)}" style="width:${p.fit}%"></div></div><span class="w-8 text-right tabular-nums font-medium">${p.fit}</span></div></td>
+        <td class="px-4 py-3"><div class="flex items-center gap-2"><button class="tgl" role="switch" aria-checked="${p.contacted}" aria-label="Contacted: ${esc(p.company)}" data-toggle="${p.id}"></button><span class="text-xs ${p.contacted ? "text-blue-700" : "text-slate-500"}">${p.contacted ? "Contacted" : "Not Contacted"}</span></div></td>
+        <td class="px-4 py-3 text-right"><button data-draft="${p.id}" class="rounded-lg border border-blue-600 text-blue-700 px-3 py-1.5 text-xs font-medium hover:bg-blue-50 transition">Draft Email</button></td>
+      </tr>`).join("");
+  },
+  bind() {
+    $("#discover").addEventListener("click", () => this.discover());
+    $("#fService").addEventListener("change", () => this.render());
+    $("#fRegion").addEventListener("change", () => this.render());
+    $("#tbody").addEventListener("click", e => {
+      const t = e.target.closest("[data-toggle]"), d = e.target.closest("[data-draft]");
+      if (t) { const p = Store.prospects.find(x => x.id == t.dataset.toggle); if (p) { p.contacted = !p.contacted; Store.save(); this.render(); } }
+      if (d) { const p = Store.prospects.find(x => x.id == d.dataset.draft); if (p) { Outreach.fill(p); UI.show("outreach"); } }
+    });
+  }
+};
 
-        function generateCustomEmail() {
-            const company = document.getElementById('outreachCompany').value;
-            const contact = document.getElementById('outreachContact').value.split(' ')[0];
-            const service = document.getElementById('outreachService').value;
+/* ---------- Outreach ---------- */
+const Outreach = {
+  fill(p) {
+    $("#oCompany").value = p.company; $("#oContact").value = p.contact || ""; $("#oTitle").value = p.title || "";
+    $("#oService").value = p.service; $("#oPain").value = p.reason || ""; $("#oTo").value = "";
+    this.generate();
+  },
+  vals() { return { company: $("#oCompany").value.trim(), contact: $("#oContact").value.trim(), title: $("#oTitle").value.trim(), service: $("#oService").value, pain: $("#oPain").value.trim() }; },
+  generate() {
+    const v = this.vals();
+    if (!v.company) { UI.toast("Enter a company name to generate a template.", "err"); return; }
+    const first = v.contact.split(" ")[0] || "there";
+    const offer = {
+      "Customer Support Outsourcing": "a dedicated, multilingual customer support team that scales with your volume while protecting CSAT",
+      "IT Managed Services & Infrastructure": "managed IT services, from 24/7 monitoring and help desk to cloud and infrastructure operations",
+      "Both service lines": "customer support outsourcing and managed IT services, delivered by one accountable partner"
+    }[v.service];
+    $("#oSubject").value = `${v.service === "Both service lines" ? "Support and IT operations" : v.service.split(" &")[0]} for ${v.company}`;
+    $("#oBody").value = `Hi ${first},\n\n${v.pain ? `I noticed ${v.company} is facing this challenge: ${v.pain.replace(/\.$/, "")}. ` : `I've been following ${v.company} and wanted to reach out. `}At Sparta Technology Solutions, we provide ${offer}.\n\nTeams like yours typically see faster response times and lower operating costs within the first quarter. I'd be glad to share a short case study and a few ideas specific to ${v.company}.\n\nWould you have 15 minutes next week for a quick call?\n\nBest regards,\n[Your name]\nSparta Technology Solutions`;
+  },
+  async improve() {
+    const v = this.vals();
+    if (!$("#oBody").value.trim()) this.generate();
+    if (!v.company) { UI.toast("Enter a company name first.", "err"); return; }
+    const btn = $("#oAI"); btn.disabled = true; btn.textContent = "Writing…";
+    try {
+      const prompt = `Rewrite this cold outreach email for a B2B prospect. Keep it under 130 words, warm, specific and free of hype. Sender: Sparta Technology Solutions (BPO and IT managed services). Recipient: ${v.contact || "unknown"} (${v.title || "decision maker"}) at ${v.company}. Service: ${v.service}. Context: ${v.pain || "none"}. Return ONLY JSON: {"subject": string, "body": string}. Keep the signature placeholder "[Your name]".\n\nCurrent draft:\n${$("#oBody").value}`;
+      const out = Gemini.parseJSON(await Gemini.call(prompt, { json: true }));
+      if (!out.subject || !out.body) throw new Error("Gemini's reply was missing a subject or body. Try again.");
+      $("#oSubject").value = out.subject; $("#oBody").value = out.body;
+      UI.toast("Draft improved with Gemini.", "ok");
+    } catch (e) { UI.toast(e.message, "err"); }
+    finally { btn.disabled = false; btn.textContent = "Improve with Gemini"; }
+  },
+  gmailUrl() {
+    const au = $("#authuser").value.trim();
+    const q = new URLSearchParams();
+    q.set("view", "cm"); q.set("fs", "1");
+    if (au) q.set("authuser", au);
+    return "https://mail.google.com/mail/?" + q.toString() +
+      "&to=" + encodeURIComponent($("#oTo").value.trim()) +
+      "&su=" + encodeURIComponent($("#oSubject").value) +
+      "&body=" + encodeURIComponent($("#oBody").value);
+  },
+  send() {
+    if (!$("#oSubject").value.trim() || !$("#oBody").value.trim()) { UI.toast("Generate or write a subject and message first.", "err"); return; }
+    if (!$("#authuser").value.trim()) UI.toast("No work email set, so Gmail will use your default signed-in account.", "info");
+    Store.set("sparta.authuser", $("#authuser").value.trim());
+    const url = this.gmailUrl();
+    if (url.length > 7500) UI.toast("This message is long and Gmail may cut it off. Shorten it if the draft looks incomplete.", "info");
+    window.open(url, "_blank", "noopener");
+  },
+  async copy() {
+    try { await navigator.clipboard.writeText($("#oSubject").value + "\n\n" + $("#oBody").value); UI.toast("Message copied.", "ok"); }
+    catch { UI.toast("Copy was blocked by the browser. Select the text and copy it manually.", "err"); }
+  },
+  bind() {
+    $("#authuser").value = Store.get("sparta.authuser", "cc.solutions@spartats.com");
+    $("#authuser").addEventListener("change", e => Store.set("sparta.authuser", e.target.value.trim()));
+    $("#oGen").addEventListener("click", () => this.generate());
+    $("#oAI").addEventListener("click", () => this.improve());
+    $("#oSend").addEventListener("click", () => this.send());
+    $("#oCopy").addEventListener("click", () => this.copy());
+    $("#oForm").addEventListener("submit", e => e.preventDefault());
+  }
+};
 
-            const drafts = [
-                `Hi ${contact},\n\nI’ve been following ${company}'s impressive expansion across international markets. As you scale, maintaining top-tier ${service} without inflating internal overhead is often a major hurdle.\n\nSparta Technology Solutions delivers expert managed teams that seamlessly integrate with your operations to eliminate bottlenecks and guarantee peak efficiency.\n\nAre you available for a brief 10-minute introduction this week?\n\nBest regards,\nSparta Technology Solutions Team`,
-                `Hello ${contact},\n\nFast-growing global leaders like ${company} frequently encounter operational bottlenecks that slow down customer delivery.\n\nSparta Technology Solutions specializes in standalone ${service}. We help leaders reduce response times by 50% while cutting support overhead.\n\nWould you be open to a quick chat on Thursday to see how we can assist?\n\nBest regards,\nSparta Technology Solutions Team`
-            ];
+/* ---------- Analytics ---------- */
+const Analytics = {
+  avg: a => a.length ? Math.round(a.reduce((s, p) => s + p.fit, 0) / a.length) : 0,
+  bars(el, rows, fmt) {
+    el.innerHTML = rows.map(r => `<div><div class="flex justify-between text-sm mb-1"><span>${esc(r.label)}</span><span class="font-medium tabular-nums">${esc(fmt(r))}</span></div><div class="h-3 rounded-full bg-slate-100"><div class="bar h-3 rounded-full ${r.cls || "bg-blue-600"}" style="width:${r.pct}%"></div></div></div>`).join("");
+  },
+  render() {
+    const all = Store.prospects, total = all.length;
+    const contacted = all.filter(p => p.contacted).length;
+    const hi = all.filter(p => p.fit >= 80).length;
+    const kpi = (l, v, n) => `<div class="bg-white rounded-xl border border-slate-200 p-4"><div class="text-sm text-slate-500">${l}</div><div class="text-3xl font-semibold text-slate-900 mt-1">${v}</div><div class="text-xs text-slate-500 mt-1">${n}</div></div>`;
+    $("#kpis").innerHTML = kpi("Average fit score", this.avg(all), "across all prospects") + kpi("Total prospects", total, "in the pipeline") + kpi("High-fit (80+)", hi, total ? Math.round(hi / total * 100) + "% of pipeline" : "No data") + kpi("Contacted", contacted, total ? Math.round(contacted / total * 100) + "% outreach coverage" : "No data");
+    this.bars($("#chartRegion"), REGIONS.map(r => { const n = all.filter(p => p.region === r).length; return { label: r, n, pct: total ? n / total * 100 : 0 }; }), r => `${r.n} accounts`);
+    this.bars($("#chartService"), SERVICES.map((s, i) => { const l = all.filter(p => p.service === s); return { label: s, avg: this.avg(l), n: l.length, pct: this.avg(l), cls: i ? "bg-slate-700" : "bg-blue-600" }; }), r => `${r.avg} avg · ${r.n} accounts`);
+    const top = all.filter(p => !p.contacted).sort((a, b) => b.fit - a.fit).slice(0, 5);
+    $("#topList").innerHTML = top.length ? top.map(p => `<li class="flex items-center justify-between py-3"><div><div class="font-medium">${esc(p.company)}</div><div class="text-xs text-slate-500">${esc(p.region)} · ${esc(p.service)}</div></div><span class="rounded-md bg-blue-50 text-blue-700 px-2 py-1 text-xs font-semibold">Fit ${p.fit}</span></li>`).join("") : `<li class="py-3 text-slate-500">Every prospect has been contacted. Discover new prospects to keep the pipeline moving.</li>`;
+  }
+};
 
-            document.getElementById('emailBody').value = drafts[Math.floor(Math.random() * drafts.length)];
-        }
-
-        function sendToGmail() {
-            const contactFull = document.getElementById('outreachContact').value;
-            const emailMatch = contactFull.match(/\(([^)]+)\)/);
-            const email = emailMatch ? emailMatch[1] : '';
-            const company = document.getElementById('outreachCompany').value;
-            const body = document.getElementById('emailBody').value;
-            const subject = encodeURIComponent(`Enhancing ${company} Operations with Sparta Technology Solutions`);
-            const encodedBody = encodeURIComponent(body);
-
-            if (email) {
-                const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${email}&su=${subject}&body=${encodedBody}`;
-                window.open(gmailUrl, '_blank');
-            } else {
-                alert('Email draft ready! Please ensure a valid email address is provided.');
-            }
-        }
-
-        function findGlobalProspects() {
-            const btn = document.getElementById('findBtn');
-            const status = document.getElementById('statusMsg');
-            btn.disabled = true;
-            status.classList.remove('hidden');
-
-            setTimeout(() => {
-                const globalLeads = [
-                    {
-                        company: "Nordic Cloud Systems",
-                        loc: "🇸🇪 Stockholm, Sweden",
-                        contact: "Astrid Lindqvist · COO",
-                        service: "IT Managed Services",
-                        badgeBg: "bg-amber-50 text-amber-700 border-amber-200",
-                        score: "97",
-                        email: "astrid@nordiccloud.se"
-                    },
-                    {
-                        company: "Montreal Retail Group",
-                        loc: "🇨🇦 Montreal, Canada",
-                        contact: "Marc Boucher · Head of Customer Success",
-                        service: "Customer Support Outsourcing",
-                        badgeBg: "bg-purple-50 text-purple-700 border-purple-200",
-                        score: "94",
-                        email: "mboucher@montrealretail.ca"
-                    },
-                    {
-                        company: "Austin Software Labs",
-                        loc: "🇺🇸 Austin, Texas, USA",
-                        contact: "Brandon Cole · VP of Engineering",
-                        service: "IT Managed Services",
-                        badgeBg: "bg-amber-50 text-amber-700 border-amber-200",
-                        score: "91",
-                        email: "bcole@austinlabs.io"
-                    }
-                ];
-
-                const tableBody = document.getElementById('prospectTable');
-                globalLeads.forEach(lead => {
-                    const row = document.createElement('tr');
-                    row.className = 'hover:bg-slate-50 transition';
-                    row.innerHTML = `
-                        <td class="p-4">
-                            <div class="font-semibold text-slate-900">${lead.company}</div>
-                            <div class="text-xs text-slate-500">${lead.loc}</div>
-                        </td>
-                        <td class="p-4 text-xs text-slate-700">${lead.contact.split('·')[0]}<br><span class="text-slate-400">${lead.contact.split('·')[1]}</span></td>
-                        <td class="p-4"><span class="${lead.badgeBg} text-xs px-2.5 py-1 rounded-full font-medium border">${lead.service}</span></td>
-                        <td class="p-4 font-bold text-blue-600">${lead.score} / 100</td>
-                        <td class="p-4">
-                            <label class="inline-flex items-center cursor-pointer">
-                                <input type="checkbox" class="sr-only peer" onchange="toggleStatus(this)">
-                                <div class="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600 relative"></div>
-                                <span class="ml-2 text-xs text-slate-600 status-text">Not Contacted</span>
-                            </label>
-                        </td>
-                        <td class="p-4">
-                            <button onclick="prepareEmail('${lead.company}', '${lead.contact.split('·')[0]}', '${lead.service}', '${lead.email}')" class="bg-blue-600 hover:bg-blue-500 text-white text-xs px-3 py-1.5 rounded font-medium transition">Draft Email</button>
-                        </td>
-                    `;
-                    tableBody.prepend(row);
-                });
-
-                status.classList.add('hidden');
-                btn.disabled = false;
-            }, 1200);
-        }
-    </script>
+/* ---------- Boot ---------- */
+(function init() {
+  Store.load();
+  $("#apiKey").value = Store.get("sparta.geminiKey");
+  $("#saveKey").addEventListener("click", () => {
+    const k = $("#apiKey").value.trim();
+    if (!k) { UI.toast("Paste your Gemini API key first.", "err"); return; }
+    UI.toast(Store.set("sparta.geminiKey", k) ? "API key saved in this browser." : "Could not save the key because browser storage is blocked. It will work until you reload.", "ok");
+    if (!Store.get("sparta.geminiKey")) Store.set("sparta.geminiKey", k);
+  });
+  $("#clearKey").addEventListener("click", () => { Store.del("sparta.geminiKey"); $("#apiKey").value = ""; UI.toast("API key removed.", "info"); });
+  $$("[data-nav]").forEach(b => b.addEventListener("click", () => UI.show(b.dataset.nav)));
+  $("#menuBtn").addEventListener("click", () => UI.openMenu());
+  $("#scrim").addEventListener("click", () => UI.closeMenu());
+  Prospects.bind(); Outreach.bind();
+  UI.show("prospects");
+})();
+</script>
 </body>
 </html>
