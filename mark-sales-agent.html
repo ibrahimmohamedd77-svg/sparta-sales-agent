@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mark · Sparta Sales Team</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body{font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid #2563eb;outline-offset:2px}
+  .pulse{animation:p 1.4s ease-in-out infinite}@keyframes p{0%,100%{box-shadow:0 0 0 0 rgba(16,185,129,.5)}50%{box-shadow:0 0 0 10px rgba(16,185,129,0)}}
+  .dots span{animation:d 1s infinite;display:inline-block}.dots span:nth-child(2){animation-delay:.15s}.dots span:nth-child(3){animation-delay:.3s}
+  @keyframes d{0%,60%,100%{opacity:.25}30%{opacity:1}}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important}}
+</style>
+</head>
+<body class="bg-slate-100 text-slate-800 h-screen flex flex-col">
+
+<header class="bg-slate-900 text-white px-4 py-3 flex flex-wrap items-center gap-3">
+  <div class="flex items-center gap-3 mr-auto">
+    <div id="avatar" class="w-10 h-10 rounded-full bg-blue-600 grid place-items-center font-semibold">M</div>
+    <div><div class="font-semibold leading-tight">Mark</div><div class="text-xs text-slate-400">Sales Agent · Sparta Sales Team</div></div>
+  </div>
+  <input id="authuser" class="w-56 rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm placeholder-slate-500" placeholder="Work email for Gmail drafts" aria-label="Work email for Gmail">
+  <input id="apiKey" type="password" autocomplete="off" class="w-44 rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm placeholder-slate-500" placeholder="Gemini API key" aria-label="Gemini API key">
+  <button id="saveKey" class="rounded-lg bg-blue-600 hover:bg-blue-500 px-3 py-2 text-sm font-medium transition">Save</button>
+  <button id="callBtn" class="rounded-lg bg-emerald-600 hover:bg-emerald-500 px-4 py-2 text-sm font-medium transition">Call Mark</button>
+</header>
+
+<div id="toast" class="hidden px-4 py-2 text-sm bg-red-50 text-red-800 border-b border-red-200" role="status"></div>
+
+<main class="flex-1 min-h-0 grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] gap-4 p-4">
+  <!-- Chat -->
+  <section class="bg-white rounded-xl border border-slate-200 flex flex-col min-h-0">
+    <div id="callBar" class="hidden px-4 py-2 text-sm bg-emerald-50 text-emerald-800 border-b border-emerald-200 rounded-t-xl"></div>
+    <div id="log" class="flex-1 overflow-y-auto p-4 space-y-3" aria-live="polite"></div>
+    <div class="px-4 pt-2 flex flex-wrap gap-2" id="chips"></div>
+    <form id="form" class="p-3 flex gap-2">
+      <input id="msg" class="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="Tell Mark what to do…" autocomplete="off" aria-label="Message to Mark">
+      <button class="rounded-lg bg-slate-900 text-white px-4 py-2 text-sm font-medium hover:bg-slate-700 transition">Send</button>
+    </form>
+  </section>
+
+  <!-- Pipeline -->
+  <section class="grid grid-rows-[minmax(0,auto)_minmax(0,1fr)] gap-4 min-h-0">
+    <div class="bg-white rounded-xl border border-slate-200 p-4 max-h-64 overflow-y-auto">
+      <div class="flex items-center justify-between mb-2"><h2 class="font-semibold">Pipeline</h2><span id="count" class="text-xs text-slate-500"></span></div>
+      <ul id="list" class="divide-y divide-slate-100"></ul>
+    </div>
+    <div id="detail" class="bg-white rounded-xl border border-slate-200 p-4 overflow-y-auto min-h-[16rem]"></div>
+  </section>
+</main>
+
+<script>
+"use strict";
+const MODEL = "gemini-3.8-flash"; // change here if Google retires this model name
+const $ = (s, r = document) => r.querySelector(s);
+const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const SERVICES = "Customer Support Outsourcing and IT Managed Services & Infrastructure";
+
+/* ---------- Store ---------- */
+const S = {
+  prospects: [], chat: [], activity: [], selected: null, nid: 1,
+  get(k, d = "") { try { return localStorage.getItem(k) ?? d; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch {} },
+  load() { try { const p = JSON.parse(this.get("mark.prospects", "[]")); if (Array.isArray(p)) { this.prospects = p; this.nid = Math.max(1, ...p.map(x => x.id + 1)); } this.activity = JSON.parse(this.get("mark.activity", "[]")) || []; } catch {} },
+  save() { this.set("mark.prospects", JSON.stringify(this.prospects)); this.set("mark.activity", JSON.stringify(this.activity.slice(-15))); },
+  log(t) { this.activity.push(new Date().toLocaleString() + ": " + t); this.save(); },
+  find(name) { const n = String(name || "").toLowerCase(); return this.prospects.find(p => n && (p.company.toLowerCase().includes(n) || n.includes(p.company.toLowerCase()))); }
+};
+
+/* ---------- Gemini ---------- */
+const G = {
+  async call(contents, { system, search = false, json = false } = {}) {
+    const key = S.get("mark.key");
+    if (!key) throw new Error("Paste your Gemini API key at the top and select Save.");
+    const body = { contents, generationConfig: { temperature: 0.8, ...(json && !search ? { responseMimeType: "application/json" } : {}) } };
+    if (system) body.systemInstruction = { parts: [{ text: system }] };
+    if (search) body.tools = [{ google_search: {} }];
+    let res;
+    try { res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, { method: "POST", headers: { "Content-Type": "application/json", "x-goog-api-key": key }, body: JSON.stringify(body) }); }
+    catch { throw new Error("Could not reach Gemini. Check your connection."); }
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const m = d?.error?.message || res.statusText;
+      if (res.status === 404) throw new Error("Model unavailable: " + m + " Update the MODEL constant in the code.");
+      if (res.status === 400 || res.status === 403) throw new Error("Gemini rejected the key or request: " + m);
+      if (res.status === 429) throw new Error("Gemini rate limit reached. Wait a minute and retry.");
+      throw new Error("Gemini error " + res.status + ": " + m);
+    }
+    const cand = d?.candidates?.[0];
+    const text = (cand?.content?.parts || []).map(p => p.text || "").join("");
+    if (!text) throw new Error("Gemini returned an empty reply. Try again.");
+    const sources = (cand?.groundingMetadata?.groundingChunks || []).map(c => c.web).filter(w => w?.uri).slice(0, 6).map(w => ({ uri: w.uri, title: w.title || w.uri }));
+    return { text, sources };
+  },
+  parse(text) {
+    const t = text.replace(/```json|```/gi, "").trim();
+    try { return JSON.parse(t); } catch {}
+    const m = t.match(/[\[{][\s\S]*[\]}]/);
+    if (m) { try { return JSON.parse(m[0]); } catch {} }
+    throw new Error("Mark's reply could not be read. Try again.");
+  }
+};
+
+/* ---------- Voice ---------- */
+const Voice = {
+  active: false, rec: null, speaking: false,
+  supported: !!(window.SpeechRecognition || window.webkitSpeechRecognition),
+  speak(text) {
+    if (!this.active || !window.speechSynthesis) return Promise.resolve();
+    return new Promise(res => {
+      this.speaking = true; try { this.rec?.abort(); } catch {}
+      const u = new SpeechSynthesisUtterance(text.replace(/[*_#`]/g, ""));
+      const v = speechSynthesis.getVoices().find(x => /en/i.test(x.lang) && /male|david|daniel|mark|google uk english male/i.test(x.name));
+      if (v) u.voice = v; u.rate = 1.03;
+      u.onend = u.onerror = () => { this.speaking = false; res(); this.listen(); };
+      speechSynthesis.cancel(); speechSynthesis.speak(u);
+    });
+  },
+  listen() {
+    if (!this.active || this.speaking || Agent.busy) return;
+    const R = window.SpeechRecognition || window.webkitSpeechRecognition;
+    this.rec = new R(); this.rec.lang = "en-US"; this.rec.interimResults = false;
+    this.rec.onresult = e => { const t = e.results[0][0].transcript.trim(); if (t) Agent.send(t); };
+    this.rec.onend = () => { if (this.active && !this.speaking && !Agent.busy) setTimeout(() => this.listen(), 300); };
+    this.rec.onerror = e => { if (e.error === "not-allowed") { UI.err("Microphone access was blocked. Allow it in your browser and call again."); this.stop(); } };
+    try { this.rec.start(); $("#callBar").textContent = "On a call with Mark · listening…"; } catch {}
+  },
+  start() {
+    if (!this.supported) { UI.err("Voice calls need Chrome or Edge. You can still type to Mark."); return; }
+    this.active = true; $("#callBar").classList.remove("hidden"); $("#callBtn").textContent = "End call";
+    $("#callBtn").className = "rounded-lg bg-red-600 hover:bg-red-500 px-4 py-2 text-sm font-medium transition"; $("#avatar").classList.add("pulse");
+    Agent.send("Hi Mark, I'm calling for the latest update. What's going on in the pipeline?", true);
+  },
+  stop() {
+    this.active = false; try { this.rec?.abort(); } catch {} speechSynthesis?.cancel();
+    $("#callBar").classList.add("hidden"); $("#callBtn").textContent = "Call Mark";
+    $("#callBtn").className = "rounded-lg bg-emerald-600 hover:bg-emerald-500 px-4 py-2 text-sm font-medium transition"; $("#avatar").classList.remove("pulse");
+  }
+};
+
+/* ---------- UI ---------- */
+const UI = {
+  err(m) { const t = $("#toast"); t.textContent = m; t.classList.remove("hidden"); clearTimeout(this.t); this.t = setTimeout(() => t.classList.add("hidden"), 8000); },
+  msg(who, text) {
+    const me = who === "user";
+    const d = document.createElement("div"); d.className = "flex " + (me ? "justify-end" : "justify-start");
+    d.innerHTML = `<div class="max-w-[85%] rounded-2xl px-4 py-2 text-sm whitespace-pre-wrap ${me ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-800"}">${esc(text)}</div>`;
+    $("#log").appendChild(d); $("#log").scrollTop = 1e9;
+  },
+  typing(on) {
+    $("#typing")?.remove();
+    if (on) { const d = document.createElement("div"); d.id = "typing"; d.className = "text-slate-400 text-sm dots"; d.innerHTML = "Mark is working<span>.</span><span>.</span><span>.</span>"; $("#log").appendChild(d); $("#log").scrollTop = 1e9; }
+  },
+  list() {
+    $("#count").textContent = S.prospects.length + " prospects";
+    $("#list").innerHTML = S.prospects.length ? S.prospects.map(p => `<li><button data-id="${p.id}" class="w-full text-left py-2 px-2 rounded-lg hover:bg-slate-50 flex items-center gap-3 ${S.selected === p.id ? "bg-blue-50" : ""}"><div class="flex-1 min-w-0"><div class="font-medium text-sm truncate">${esc(p.company)}</div><div class="text-xs text-slate-500 truncate">${esc(p.region)} · ${esc(p.service)}</div></div><span class="text-xs rounded-md bg-slate-100 px-2 py-1">${esc(p.status)}</span>${p.interest != null ? `<span class="text-xs font-semibold text-blue-700 w-8 text-right">${p.interest}</span>` : ""}</button></li>`).join("") : `<li class="text-sm text-slate-500 py-3">Nothing yet. Ask Mark to find prospects.</li>`;
+  },
+  detail() {
+    const p = S.prospects.find(x => x.id === S.selected), el = $("#detail");
+    if (!p) { el.innerHTML = `<p class="text-sm text-slate-500">Select a prospect to see Mark's research and email draft.</p>`; return; }
+    const r = p.research;
+    el.innerHTML = `<div class="flex flex-wrap items-start gap-2 mb-3"><div class="mr-auto"><h2 class="font-semibold text-lg">${esc(p.company)}</h2><div class="text-xs text-slate-500">${esc(p.industry)} · ${esc(p.region)} · ${esc(p.title)}${p.website ? ` · ${esc(p.website)}` : ""}</div></div><button data-act="research" class="rounded-lg border border-blue-600 text-blue-700 px-3 py-1.5 text-xs font-medium hover:bg-blue-50">${r ? "Re-research" : "Research"}</button><button data-act="draft" class="rounded-lg bg-blue-600 text-white px-3 py-1.5 text-xs font-medium hover:bg-blue-700">${p.email ? "Redraft email" : "Draft email"}</button></div>
+    <p class="text-sm text-slate-600 mb-3">${esc(p.why)}</p>
+    ${r ? `<div class="rounded-lg bg-slate-50 p-3 mb-3 text-sm space-y-2"><div class="font-medium">Interest: ${p.interest}/100 · ${esc(r.verdict)}</div><p>${esc(r.background)}</p>${(r.signals || []).length ? `<div><div class="font-medium">Recent signals</div><ul class="list-disc pl-5">${r.signals.map(s => `<li>${esc(s)}</li>`).join("")}</ul></div>` : ""}${(r.pains || []).length ? `<div><div class="font-medium">Likely pain points</div><ul class="list-disc pl-5">${r.pains.map(s => `<li>${esc(s)}</li>`).join("")}</ul></div>` : ""}${(p.sources || []).length ? `<div class="text-xs text-slate-500">Sources: ${p.sources.map(s => `<a class="underline" target="_blank" rel="noopener" href="${esc(s.uri)}">${esc(s.title)}</a>`).join(", ")}</div>` : ""}</div>` : `<p class="text-sm text-slate-500 mb-3">Not researched yet.</p>`}
+    ${p.email ? `<div class="space-y-2"><input id="eTo" value="${esc(p.to || "")}" placeholder="Recipient email" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"><input id="eSub" value="${esc(p.email.subject)}" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"><textarea id="eBody" rows="10" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">${esc(p.email.body)}</textarea><button data-act="gmail" class="rounded-lg bg-slate-900 text-white px-4 py-2 text-sm font-medium hover:bg-slate-700">Send to Gmail drafts</button></div>` : ""}`;
+  }
+};
+
+/* ---------- Agent ---------- */
+const Agent = {
+  busy: false,
+  system() {
+    const pipe = S.prospects.map(p => `- ${p.company} (${p.region}, ${p.service}) status=${p.status}${p.interest != null ? `, interest=${p.interest}/100 (${p.research?.verdict})` : ""}`).join("\n") || "(empty)";
+    return `You are Mark, a sharp, friendly, human-sounding sales agent on the Sparta Sales Team at Sparta Technology Solutions, a BPO and IT managed services company. You sell ${SERVICES} to companies in the US, Canada and the EU. Speak naturally in 1-3 short sentences, as in a phone call.
+Current pipeline:\n${pipe}\nRecent activity:\n${S.activity.slice(-8).join("\n") || "(none)"}
+Reply ONLY as JSON: {"reply": string, "action": "none"|"find"|"research"|"draft", "target": string}.
+Use action "find" when asked to look for prospects (target = the criteria, or "" for a default mix). Use "research" or "draft" for a named pipeline company (target = its name). Say what you're about to do in "reply". For updates, summarize the pipeline and activity honestly and suggest a next step. Emails are only opened as Gmail drafts for the user to review; never say you sent one. Never invent facts about companies.`;
+  },
+  async send(text, silentUser) {
+    if (this.busy) return;
+    this.busy = true;
+    if (!silentUser) UI.msg("user", text); else UI.msg("user", text);
+    UI.typing(true);
+    try {
+      S.chat.push({ role: "user", parts: [{ text }] });
+      const { text: raw } = await G.call(S.chat.slice(-14), { system: this.system(), json: true });
+      const out = G.parse(raw); const reply = String(out.reply || "");
+      S.chat.push({ role: "model", parts: [{ text: reply }] });
+      UI.typing(false); UI.msg("mark", reply);
+      this.busy = false; await Voice.speak(reply); this.busy = true;
+      UI.typing(true);
+      const note = await this.run(out.action, out.target);
+      UI.typing(false);
+      if (note) { UI.msg("mark", note); S.chat.push({ role: "model", parts: [{ text: note }] }); this.busy = false; await Voice.speak(note); }
+    } catch (e) { UI.typing(false); UI.err(e.message); if (Voice.active) await Voice.speak("Sorry, I hit a problem. " + e.message.slice(0, 80)); }
+    finally { UI.typing(false); this.busy = false; Voice.listen(); }
+  },
+  async run(action, target) {
+    if (action === "find") return this.find(target);
+    const p = S.find(target) || S.prospects.find(x => x.id === S.selected);
+    if (action === "research") return p ? this.research(p) : "Which company should I research? Tell me the name from the pipeline.";
+    if (action === "draft") return p ? this.draft(p) : "Which company should I draft the email for?";
+    return "";
+  },
+  async find(criteria) {
+    const prompt = `Use Google Search to find 5 real companies in the United States, Canada or the European Union that are likely buyers of ${SERVICES}. ${criteria ? "Criteria: " + criteria + "." : "Mix regions and industries."} Exclude: ${S.prospects.map(p => p.company).join("; ") || "none"}. Prefer companies showing buying signals (growth, hiring support or IT staff, expansion, new funding). Return ONLY a JSON array of objects with: company, website, region ("US","CA" or "EU"), industry, service (exactly "Customer Support Outsourcing" or "IT Managed Services & Infrastructure"), contact_title (likely decision maker), why (one sentence on the buying signal).`;
+    const { text } = await G.call([{ role: "user", parts: [{ text: prompt }] }], { search: true });
+    const arr = G.parse(text); let added = 0;
+    (Array.isArray(arr) ? arr : arr.prospects || []).forEach(r => {
+      if (!r?.company || S.find(r.company) && S.find(r.company).company.toLowerCase() === String(r.company).toLowerCase()) return;
+      const reg = String(r.region || "").toUpperCase();
+      S.prospects.unshift({ id: S.nid++, company: String(r.company), website: String(r.website || ""), region: ["US", "CA", "EU"].includes(reg) ? reg : "EU", industry: String(r.industry || "General"), service: /it|infra/i.test(r.service || "") ? "IT Managed Services & Infrastructure" : "Customer Support Outsourcing", title: String(r.contact_title || "Decision maker"), why: String(r.why || ""), status: "new", interest: null, research: null, email: null, sources: [], to: "" });
+      added++;
+    });
+    S.log(`Searched for prospects${criteria ? " (" + criteria + ")" : ""}: ${added} new`); S.save(); UI.list();
+    return added ? `I found ${added} new prospects and added them to the pipeline. Want me to research the strongest ones?` : "I only found companies you already have. Give me a different industry or region and I'll search again.";
+  },
+  async research(p) {
+    const prompt = `Use Google Search to research ${p.company}${p.website ? " (" + p.website + ")" : ""} as a sales prospect for ${p.service}. Find what they do, recent news, hiring, growth or IT/support signals, and likely pain points. Judge honestly how interested they are likely to be. Return ONLY JSON: {"background": string (2-3 sentences), "signals": string[] (up to 4, only facts you found), "pains": string[] (up to 3), "interest_score": integer 0-100, "verdict": string (short, e.g. "Warm: hiring support agents")}.`;
+    const { text, sources } = await G.call([{ role: "user", parts: [{ text: prompt }] }], { search: true });
+    const o = G.parse(text);
+    p.research = { background: String(o.background || ""), signals: o.signals || [], pains: o.pains || [], verdict: String(o.verdict || "") };
+    p.interest = Math.max(0, Math.min(100, Math.round(Number(o.interest_score) || 0))); p.sources = sources;
+    if (p.status === "new") p.status = "researched";
+    S.selected = p.id; S.log(`Researched ${p.company}: interest ${p.interest}`); S.save(); UI.list(); UI.detail();
+    return `Done with ${p.company}. Interest looks like ${p.interest} out of 100. ${p.research.verdict}.`;
+  },
+  async draft(p) {
+    if (!p.research) await this.research(p);
+    const r = p.research;
+    const prompt = `Write a custom cold outreach email from Mark of Sparta Technology Solutions to the ${p.title} at ${p.company}, offering ${p.service}. Use these researched facts and only these: ${r.background} Signals: ${r.signals.join("; ")}. Pain points: ${r.pains.join("; ")}. Under 130 words, warm, specific, no hype, one clear ask (15-minute call). Sign as "Mark, Sparta Sales Team". Return ONLY JSON: {"subject": string, "body": string}.`;
+    const { text } = await G.call([{ role: "user", parts: [{ text: prompt }] }], { json: true });
+    const o = G.parse(text);
+    if (!o.subject || !o.body) throw new Error("Mark's draft was incomplete. Try again.");
+    p.email = { subject: String(o.subject), body: String(o.body) }; if (p.status !== "in Gmail") p.status = "drafted";
+    S.selected = p.id; S.log(`Drafted email for ${p.company}`); S.save(); UI.list(); UI.detail();
+    return `The email for ${p.company} is ready on the right. Add the recipient and send it to Gmail drafts when you're happy with it.`;
+  },
+  gmail(p) {
+    p.to = $("#eTo")?.value.trim() || ""; p.email.subject = $("#eSub").value; p.email.body = $("#eBody").value;
+    const au = S.get("mark.authuser").trim(), q = new URLSearchParams({ view: "cm", fs: "1" });
+    if (au) q.set("authuser", au); else UI.err("No work email set, so Gmail will use your default signed-in account.");
+    const url = "https://mail.google.com/mail/?" + q + "&to=" + encodeURIComponent(p.to) + "&su=" + encodeURIComponent(p.email.subject) + "&body=" + encodeURIComponent(p.email.body);
+    window.open(url, "_blank", "noopener"); p.status = "in Gmail"; S.log(`Opened Gmail draft for ${p.company}`); S.save(); UI.list();
+  }
+};
+
+/* ---------- Boot ---------- */
+(function () {
+  S.load();
+  $("#apiKey").value = S.get("mark.key"); $("#authuser").value = S.get("mark.authuser", "cc.solutions@spartats.com");
+  $("#saveKey").onclick = () => { const k = $("#apiKey").value.trim(); if (!k) return UI.err("Paste your Gemini API key first."); S.set("mark.key", k); S.set("mark.authuser", $("#authuser").value.trim()); UI.err("Saved in this browser."); };
+  $("#authuser").onchange = e => S.set("mark.authuser", e.target.value.trim());
+  $("#callBtn").onclick = () => Voice.active ? Voice.stop() : Voice.start();
+  $("#form").onsubmit = e => { e.preventDefault(); const t = $("#msg").value.trim(); if (t) { $("#msg").value = ""; Agent.send(t); } };
+  $("#list").onclick = e => { const b = e.target.closest("[data-id]"); if (b) { S.selected = +b.dataset.id; UI.list(); UI.detail(); } };
+  $("#detail").onclick = e => {
+    const b = e.target.closest("[data-act]"), p = S.prospects.find(x => x.id === S.selected); if (!b || !p || Agent.busy) return;
+    if (b.dataset.act === "gmail") return Agent.gmail(p);
+    Agent.busy = true; UI.typing(true);
+    Agent[b.dataset.act](p).then(n => UI.msg("mark", n)).catch(err => UI.err(err.message)).finally(() => { UI.typing(false); Agent.busy = false; });
+  };
+  [["Find prospects", "Find me 5 new prospects in the US, Canada and EU"], ["Research the top one", "Research the highest-fit prospect in the pipeline"], ["Draft an email", "Draft an email for the most promising prospect"], ["Latest update", "Give me the latest update on the pipeline"]]
+    .forEach(([l, m]) => { const b = document.createElement("button"); b.className = "rounded-full border border-slate-300 px-3 py-1 text-xs hover:bg-slate-50"; b.textContent = l; b.onclick = () => Agent.send(m); $("#chips").appendChild(b); });
+  UI.msg("mark", "Hi, I'm Mark from the Sparta Sales Team. I can find prospects, research whether they're a real fit, and draft custom emails for your Gmail. What should we go after first?");
+  UI.list(); UI.detail();
+})();
+</script>
+</body>
+</html>
